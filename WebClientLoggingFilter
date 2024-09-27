@@ -54,6 +54,34 @@ class WebClientLoggingFilter {
     }
 }
 
+fun logRequestBody(request: ClientRequest): ClientRequest {
+    val logBuilder = StringBuilder("Request:\n")
+    logBuilder.append("${request.method()} ${request.url()}\n")
+
+    // Log headers
+    val headers: HttpHeaders = request.headers()
+    headers.forEach { name, values ->
+        logBuilder.append("$name: $values\n")
+    }
+
+    // Log body if present
+    if (request.body() != null) {
+        request.body().insert { outputMessage, _ ->
+            outputMessage.body.doOnNext { dataBuffer ->
+                val bodyBytes = ByteArray(dataBuffer.readableByteCount())
+                dataBuffer.read(bodyBytes)
+                val bodyString = String(bodyBytes, StandardCharsets.UTF_8)
+                logBuilder.append("Body: $bodyString\n")
+                println(logBuilder.toString())  // Log the request body to the console
+            }
+        }
+    } else {
+        println(logBuilder.toString())  // Log the request when there's no body
+    }
+
+    return request
+}
+
 
 @Configuration
 class WebClientConfig {
