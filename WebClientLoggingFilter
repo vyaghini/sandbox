@@ -93,3 +93,14 @@ class WebClientConfig {
             .build()
     }
 }
+
+   private ClientRequest interceptBody(ClientRequest request) {
+        return ClientRequest.from(request)
+            .body((outputMessage, context) -> request.body().insert(new ClientHttpRequestDecorator(outputMessage) {
+                @Override public Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
+                    return super.writeWith(Mono.from(body)
+                        .doOnNext(dataBuffer -> logRequestBody(dataBuffer)));
+                }
+            }, context))
+            .build();
+    }
