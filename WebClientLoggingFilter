@@ -1,0 +1,67 @@
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.client.ClientRequest
+import org.springframework.web.reactive.function.client.ClientResponse
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction
+import reactor.core.publisher.Mono
+import java.nio.charset.StandardCharsets
+
+@Component
+class WebClientLoggingFilter {
+
+    private val log = LoggerFactory.getLogger(WebClientLoggingFilter::class.java)
+
+    // Filter to log both request and response
+    fun logRequestAndResponse(): ExchangeFilterFunction {
+        return ExchangeFilterFunction.ofRequestProcessor { clientRequest ->
+            logRequest(clientRequest)
+            Mono.just(clientRequest)
+        }.andThen(ExchangeFilterFunction.ofResponseProcessor { clientResponse ->
+            logResponse(clientResponse)
+        })
+    }
+
+    // Log the request details
+    private fun logRequest(request: ClientRequest) {
+        log.info("Request: ${request.method()} ${request.url()}")
+        request.headers().forEach { name, values ->
+            values.forEach { value -> log.info("$name: $value") }
+        }
+        // Assuming request body is logged in some custom way if necessary
+        request.body()?.let {
+            log.info("Request body: ${it::class.java.simpleName}") // Cannot directly log body, so logging its class
+        }
+    }
+
+    // Log the response details
+    private fun logResponse(response: ClientResponse): Mono<ClientResponse> {
+        log.info("Response status code: ${response.statusCode()}")
+        response.headers().asHttpHeaders().forEach { name, values ->
+            values.forEach { value -> log.info("$name: $value") }
+        }
+
+        return response.bodyToMono(String::class.java)
+            .flatMap { body ->
+                log.info("Response body: $body")
+                // Create a new ClientResponse with the logged body to preserve it
+                Mono.just(
+                    ClientResponse.from(response)
+                        .body(body)
+                        .headers { it.addAll(response.headers().asHttpHeaders()) }
+                        .build()
+                )
+            }
+    }
+}
+
+
+@Configuration
+class WebClientConfig {
+
+    @Bean
+    fun webClient(builder: WebClient.Builder): WebClient {
+        return builder
+            .filter(WebClientLoggingFilter().logRequestAndResponse()) // Add the logging filter here
+            .build()
+    }
+}
