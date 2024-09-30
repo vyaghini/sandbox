@@ -104,3 +104,5 @@ class WebClientConfig {
             }, context))
             .build();
     }
+
+https://stackademic.com/blog/log-spring-webclient-request-and-response-412559f07a47
