@@ -10,3 +10,4 @@ CREATE TABLE USER_PREFENCE (
     GRADLE_ID NUMERIC PRIMARY KEY,                 
 );
 
+-- opentable/otj-pg-embedded or zonkyio/embedded-postgres
