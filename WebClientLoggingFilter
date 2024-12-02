@@ -21,3 +21,30 @@ fun getNextMidnightInUTC(timeZone: String): String {
         throw IllegalArgumentException("Invalid time zone provided: $timeZone")
     }
 }
+
+import java.time.*
+import java.time.format.DateTimeFormatter
+
+fun getNextMidnightInUTC(timeZone: String): String {
+    try {
+        // Get the current moment in UTC
+        val now = Instant.now()
+
+        // Convert to the given time zone
+        val zoneId = ZoneId.of(timeZone)
+        val zonedDateTime = now.atZone(zoneId)
+
+        // Calculate midnight of the next day in the specified time zone
+        val nextMidnight = zonedDateTime.toLocalDate()
+            .plusDays(1)
+            .atStartOfDay(zoneId)
+
+        // Convert next midnight to an Instant
+        val nextMidnightInstant = nextMidnight.toInstant()
+
+        // Format the Instant as a UTC string
+        return DateTimeFormatter.ISO_INSTANT.format(nextMidnightInstant)
+    } catch (e: Exception) {
+        throw IllegalArgumentException("Invalid time zone provided: $timeZone")
+    }
+}
