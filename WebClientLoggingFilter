@@ -1,108 +1,23 @@
-import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.ClientRequest
-import org.springframework.web.reactive.function.client.ClientResponse
-import org.springframework.web.reactive.function.client.ExchangeFilterFunction
-import reactor.core.publisher.Mono
-import java.nio.charset.StandardCharsets
+import java.time.*
+import java.time.format.DateTimeFormatter
 
-@Component
-class WebClientLoggingFilter {
+fun getNextMidnightInUTC(timeZone: String): String {
+    try {
+        // Get the current date and time in the specified time zone
+        val zoneId = ZoneId.of(timeZone)
+        val now = ZonedDateTime.now(zoneId)
 
-    private val log = LoggerFactory.getLogger(WebClientLoggingFilter::class.java)
+        // Calculate midnight of the next day in the specified time zone
+        val nextMidnight = now.toLocalDate()
+            .plusDays(1)
+            .atStartOfDay(zoneId)
 
-    // Filter to log both request and response
-    fun logRequestAndResponse(): ExchangeFilterFunction {
-        return ExchangeFilterFunction.ofRequestProcessor { clientRequest ->
-            logRequest(clientRequest)
-            Mono.just(clientRequest)
-        }.andThen(ExchangeFilterFunction.ofResponseProcessor { clientResponse ->
-            logResponse(clientResponse)
-        })
-    }
+        // Convert the next midnight time to UTC
+        val utcTime = nextMidnight.withZoneSameInstant(ZoneOffset.UTC)
 
-    // Log the request details
-    private fun logRequest(request: ClientRequest) {
-        log.info("Request: ${request.method()} ${request.url()}")
-        request.headers().forEach { name, values ->
-            values.forEach { value -> log.info("$name: $value") }
-        }
-        // Assuming request body is logged in some custom way if necessary
-        request.body()?.let {
-            log.info("Request body: ${it::class.java.simpleName}") // Cannot directly log body, so logging its class
-        }
-    }
-
-    // Log the response details
-    private fun logResponse(response: ClientResponse): Mono<ClientResponse> {
-        log.info("Response status code: ${response.statusCode()}")
-        response.headers().asHttpHeaders().forEach { name, values ->
-            values.forEach { value -> log.info("$name: $value") }
-        }
-
-        return response.bodyToMono(String::class.java)
-            .flatMap { body ->
-                log.info("Response body: $body")
-                // Create a new ClientResponse with the logged body to preserve it
-                Mono.just(
-                    ClientResponse.from(response)
-                        .body(body)
-                        .headers { it.addAll(response.headers().asHttpHeaders()) }
-                        .build()
-                )
-            }
+        // Format the UTC time as a string
+        return utcTime.format(DateTimeFormatter.ISO_INSTANT)
+    } catch (e: Exception) {
+        throw IllegalArgumentException("Invalid time zone provided: $timeZone")
     }
 }
-
-fun logRequestBody(request: ClientRequest): ClientRequest {
-    val logBuilder = StringBuilder("Request:\n")
-    logBuilder.append("${request.method()} ${request.url()}\n")
-
-    // Log headers
-    val headers: HttpHeaders = request.headers()
-    headers.forEach { name, values ->
-        logBuilder.append("$name: $values\n")
-    }
-
-    // Log body if present
-    if (request.body() != null) {
-        request.body().insert { outputMessage, _ ->
-            outputMessage.body.doOnNext { dataBuffer ->
-                val bodyBytes = ByteArray(dataBuffer.readableByteCount())
-                dataBuffer.read(bodyBytes)
-                val bodyString = String(bodyBytes, StandardCharsets.UTF_8)
-                logBuilder.append("Body: $bodyString\n")
-                println(logBuilder.toString())  // Log the request body to the console
-            }
-        }
-    } else {
-        println(logBuilder.toString())  // Log the request when there's no body
-    }
-
-    return request
-}
-
-
-@Configuration
-class WebClientConfig {
-
-    @Bean
-    fun webClient(builder: WebClient.Builder): WebClient {
-        return builder
-            .filter(WebClientLoggingFilter().logRequestAndResponse()) // Add the logging filter here
-            .build()
-    }
-}
-
-   private ClientRequest interceptBody(ClientRequest request) {
-        return ClientRequest.from(request)
-            .body((outputMessage, context) -> request.body().insert(new ClientHttpRequestDecorator(outputMessage) {
-                @Override public Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
-                    return super.writeWith(Mono.from(body)
-                        .doOnNext(dataBuffer -> logRequestBody(dataBuffer)));
-                }
-            }, context))
-            .build();
-    }
-
-https://stackademic.com/blog/log-spring-webclient-request-and-response-412559f07a47
