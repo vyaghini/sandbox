@@ -1,0 +1,22 @@
+#EXTM3U
+#KODIPROP:http-reconnect=true
+#KODIPROP:inputstream=inputstream.ffmpegdirect
+#KODIPROP:inputstream.ffmpegdirect.stream_mode=timeshift
+#KODIPROP:inputstream.ffmpegdirect.is_realtime_stream=true
+#KODIPROP:inputstream=inputstream.adaptive
+#EXTINF:-1 tvg-id="BabyFirst.us" tvg-logo="https://i.imgur.com/WxLHBwu.png" group-title="Kids",BabyFirst (1080p)
+https://lte.wiseplayout.com/WiseM3U8_12/master.m3u8
+#EXTINF:-1 tvg-id="DisneyChannel.pl" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f4/Disney_Channel_logo_%282014%29.svg/512px-Disney_Channel_logo_%282014%29.svg.png" group-title="Kids",Disney Channel
+http://109.233.89.170/Disney_Channel/mono.m3u8
+#EXTINF:-1 tvg-id="Polsat.pl" tvg-shift="3 minutes" tvg-logo="https://i.imgur.com/xff6zGN.png" group-title="Undefined",Polsat (1080p) [Geo-blocked]
+https://lb2-e2-19.pluscdn.pl/ch/1502600/308/dash/20a18c30/live.mpd
+#EXTINF:-1 tvg-id="TVRepublika.pl" tvg-logo="https://i.imgur.com/ljpK6dZ.png" group-title="Undefined",TV Republika (1080p) [Not 24/7]
+https://ythls.armelin.one/channel/UCc282c_TN8xIba_Z6GaDnQw.m3u8
+#EXTINF:-1 tvg-id="TVMN.pl" tvg-logo="https://i.imgur.com/QjmtXxU.jpeg" group-title="News",TVMN (1080p)
+https://r.e.blueonline.tv/nb/videokadrabr/live1/playlist.m3u8
+#EXTINF:-1 tvg-id="TVP2.pl" tvg-logo="https://i.imgur.com/XxCc32B.png" group-title="Undefined",TVP2 (1080p)
+https://ec04-waw4.cache.orange.pl/dai4/org2/vb/105/tvp2hd/index.m3u8
+#EXTINF:-1 tvg-id="TVP3Warszawa.pl" tvg-logo="https://i.imgur.com/AfZOO8U.jpg" group-title="Undefined",TVP 3 Warszawa (1080p)
+https://irylek.ct8.pl/stream/tvp3warszawahd
+#EXTINF:-1 tvg-id="TVPWilno.pl" tvg-logo="https://i.imgur.com/8oORLGF.png" group-title="News",TVP Wilno (1080p)
+https://irylek.ct8.pl/stream/tvpwilno
