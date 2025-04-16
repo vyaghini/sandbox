@@ -1,12 +1,12 @@
 package com.example.demo.filter
 
+import com.example.demo.security.CustomUserDetails
 import jakarta.servlet.Filter
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletRequest
 import jakarta.servlet.ServletResponse
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.stereotype.Component
 
 @Component
@@ -21,22 +21,18 @@ class UserIdExtractionFilter : Filter {
 
         var userId: String? = null
 
-        // 1. Try to get userId from SecurityContext (AuthenticationPrincipal)
         val authentication = SecurityContextHolder.getContext().authentication
         val principal = authentication?.principal
 
         userId = when (principal) {
-            is UserDetails -> principal.username
-            is String -> principal
+            is CustomUserDetails -> principal.userId
             else -> null
         }
 
-        // 2. Fallback to header
         if (userId.isNullOrBlank()) {
             userId = httpRequest.getHeader(USER_ID_HEADER)
         }
 
-        // 3. Optional: attach it to request or log it
         userId?.let {
             httpRequest.setAttribute("userId", it)
             println("Extracted User ID: $it")
