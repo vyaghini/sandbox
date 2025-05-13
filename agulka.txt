@@ -1,74 +1,59 @@
 import org.slf4j.LoggerFactory
-import org.springframework.cache.interceptor.*
-import org.springframework.stereotype.Component
-import java.lang.reflect.Method
-import kotlin.system.measureTimeMillis
+import org.springframework.cache.Cache
+import org.springframework.data.redis.cache.RedisCache
+import org.springframework.data.redis.cache.RedisCacheConfiguration
+import org.springframework.data.redis.cache.RedisCacheWriter
 
-class LoggingCacheAspect : CacheAspectSupport() {
+class LoggingRedisCache(
+    name: String,
+    cacheWriter: RedisCacheWriter,
+    cacheConfig: RedisCacheConfiguration
+) : RedisCache(name, cacheWriter, cacheConfig) {
 
-    private val logger = LoggerFactory.getLogger(LoggingCacheAspect::class.java)
+    private val logger = LoggerFactory.getLogger(LoggingRedisCache::class.java)
 
-    override fun invokeOperation(context: CacheOperationInvocationContext<CacheOperation>): Any? {
-        val method: Method = context.method
-        val cacheNames = context.operation.cacheNames
-        val key = generateKey(context)
+    override fun get(key: Any): Cache.ValueWrapper? {
+        val start = System.currentTimeMillis()
+        val result = super.get(key)
+        val duration = System.currentTimeMillis() - start
 
-        var result: Any?
-        val time = measureTimeMillis {
-            result = super.invokeOperation(context)
+        if (result != null) {
+            logger.info("Redis cache HIT for key '$key' in cache '$name' took ${duration}ms")
+        } else {
+            logger.info("Redis cache MISS for key '$key' in cache '$name' took ${duration}ms")
         }
 
-        logger.info(
-            "Cache operation '${method.name}' with cache(s) '${cacheNames.joinToString()}' and key '$key' took ${time}ms"
-        )
         return result
-    }
-
-    private fun generateKey(context: CacheOperationInvocationContext<CacheOperation>): Any? {
-        return keyGenerator.generate(context.target, context.method, *context.args)
     }
 }
 
+import org.springframework.data.redis.cache.RedisCacheManager
+import org.springframework.data.redis.cache.RedisCacheWriter
+import org.springframework.data.redis.cache.RedisCacheConfiguration
+import org.springframework.cache.Cache
 
+class LoggingRedisCacheManager(
+    private val writer: RedisCacheWriter,
+    private val defaultConfig: RedisCacheConfiguration
+) : RedisCacheManager(writer, defaultConfig) {
 
-import org.springframework.cache.annotation.EnableCaching
-import org.springframework.cache.interceptor.*
+    override fun createRedisCache(name: String, cacheConfig: RedisCacheConfiguration): Cache {
+        return LoggingRedisCache(name, writer, cacheConfig)
+    }
+}
+
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator
+import org.springframework.data.redis.connection.RedisConnectionFactory
+import org.springframework.data.redis.cache.RedisCacheConfiguration
 
 @Configuration
-@EnableCaching
 class CacheConfig {
 
     @Bean
-    fun loggingCacheAspect(
-        cacheResolver: CacheResolver,
-        keyGenerator: KeyGenerator,
-        errorHandler: CacheErrorHandler
-    ): LoggingCacheAspect {
-        val aspect = LoggingCacheAspect()
-        aspect.setCacheResolver(cacheResolver)
-        aspect.setKeyGenerator(keyGenerator)
-        aspect.setErrorHandler(errorHandler)
-        return aspect
-    }
-
-    @Bean
-    fun cacheAdvisor(loggingCacheAspect: LoggingCacheAspect): CacheInterceptor {
-        val interceptor = CacheInterceptor()
-        interceptor.setCacheOperationSource(loggingCacheAspect.cacheOperationSource)
-        interceptor.setCacheResolver(loggingCacheAspect.cacheResolver)
-        interceptor.setKeyGenerator(loggingCacheAspect.keyGenerator)
-        interceptor.setErrorHandler(loggingCacheAspect.errorHandler)
-        return interceptor
-    }
-
-    @Bean
-    fun cacheAdvisorProxy(): BeanNameAutoProxyCreator {
-        val proxyCreator = BeanNameAutoProxyCreator()
-        proxyCreator.setBeanNames("*Service", "*Repository") // adjust as needed
-        proxyCreator.setInterceptorNames("cacheAdvisor")
-        return proxyCreator
+    fun cacheManager(redisConnectionFactory: RedisConnectionFactory): LoggingRedisCacheManager {
+        val writer = RedisCacheWriter.nonLockingRedisCacheWriter(redisConnectionFactory)
+        val config = RedisCacheConfiguration.defaultCacheConfig()
+        return LoggingRedisCacheManager(writer, config)
     }
 }
