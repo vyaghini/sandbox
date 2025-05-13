@@ -1,59 +1,66 @@
 import org.slf4j.LoggerFactory
-import org.springframework.cache.Cache
-import org.springframework.data.redis.cache.RedisCache
-import org.springframework.data.redis.cache.RedisCacheConfiguration
 import org.springframework.data.redis.cache.RedisCacheWriter
+import org.springframework.data.redis.connection.RedisConnection
+import org.springframework.data.redis.connection.RedisConnectionFactory
+import org.springframework.data.redis.core.RedisCallback
+import org.springframework.data.redis.core.RedisTemplate
+import java.time.Duration
 
-class LoggingRedisCache(
-    name: String,
-    cacheWriter: RedisCacheWriter,
-    cacheConfig: RedisCacheConfiguration
-) : RedisCache(name, cacheWriter, cacheConfig) {
+class LoggingRedisCacheWriter(
+    private val delegate: RedisCacheWriter,
+    private val redisConnectionFactory: RedisConnectionFactory
+) : RedisCacheWriter {
 
-    private val logger = LoggerFactory.getLogger(LoggingRedisCache::class.java)
+    private val logger = LoggerFactory.getLogger(LoggingRedisCacheWriter::class.java)
 
-    override fun get(key: Any): Cache.ValueWrapper? {
+    override fun get(name: String, key: ByteArray): ByteArray? {
         val start = System.currentTimeMillis()
-        val result = super.get(key)
+        val value = delegate.get(name, key)
         val duration = System.currentTimeMillis() - start
+        logger.info("RedisCache GET [$name] key=${key.toString(Charsets.UTF_8)} took ${duration}ms - ${if (value != null) "HIT" else "MISS"}")
+        return value
+    }
 
-        if (result != null) {
-            logger.info("Redis cache HIT for key '$key' in cache '$name' took ${duration}ms")
-        } else {
-            logger.info("Redis cache MISS for key '$key' in cache '$name' took ${duration}ms")
-        }
+    override fun put(name: String, key: ByteArray, value: ByteArray, ttl: Duration) {
+        val start = System.currentTimeMillis()
+        delegate.put(name, key, value, ttl)
+        val duration = System.currentTimeMillis() - start
+        logger.info("RedisCache PUT [$name] key=${key.toString(Charsets.UTF_8)} took ${duration}ms")
+    }
 
+    override fun putIfAbsent(name: String, key: ByteArray, value: ByteArray, ttl: Duration): ByteArray? {
+        val start = System.currentTimeMillis()
+        val result = delegate.putIfAbsent(name, key, value, ttl)
+        val duration = System.currentTimeMillis() - start
+        logger.info("RedisCache PUT_IF_ABSENT [$name] key=${key.toString(Charsets.UTF_8)} took ${duration}ms")
         return result
     }
-}
 
-import org.springframework.data.redis.cache.RedisCacheManager
-import org.springframework.data.redis.cache.RedisCacheWriter
-import org.springframework.data.redis.cache.RedisCacheConfiguration
-import org.springframework.cache.Cache
-
-class LoggingRedisCacheManager(
-    private val writer: RedisCacheWriter,
-    private val defaultConfig: RedisCacheConfiguration
-) : RedisCacheManager(writer, defaultConfig) {
-
-    override fun createRedisCache(name: String, cacheConfig: RedisCacheConfiguration): Cache {
-        return LoggingRedisCache(name, writer, cacheConfig)
-    }
+    override fun remove(name: String, key: ByteArray) = delegate.remove(name, key)
+    override fun clean(name: String, pattern: ByteArray) = delegate.clean(name, pattern)
 }
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.cache.RedisCacheConfiguration
+import org.springframework.data.redis.cache.RedisCacheManager
+import org.springframework.data.redis.cache.RedisCacheWriter
+import org.springframework.data.redis.connection.RedisConnectionFactory
 
 @Configuration
-class CacheConfig {
+class RedisCacheConfig {
 
     @Bean
-    fun cacheManager(redisConnectionFactory: RedisConnectionFactory): LoggingRedisCacheManager {
-        val writer = RedisCacheWriter.nonLockingRedisCacheWriter(redisConnectionFactory)
-        val config = RedisCacheConfiguration.defaultCacheConfig()
-        return LoggingRedisCacheManager(writer, config)
+    fun cacheManager(redisConnectionFactory: RedisConnectionFactory): RedisCacheManager {
+        val defaultCacheConfig = RedisCacheConfiguration.defaultCacheConfig()
+
+        val loggingWriter = LoggingRedisCacheWriter(
+            RedisCacheWriter.nonLockingRedisCacheWriter(redisConnectionFactory),
+            redisConnectionFactory
+        )
+
+        return RedisCacheManager.builder(loggingWriter)
+            .cacheDefaults(defaultCacheConfig)
+            .build()
     }
 }
